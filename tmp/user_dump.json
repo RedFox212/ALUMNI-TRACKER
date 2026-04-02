@@ -1,0 +1,37 @@
+[
+    {
+        "id": 1,
+        "name": "System Admin",
+        "email": "admin@lyceum.edu.ph",
+        "role": "admin",
+        "is_active": 1
+    },
+    {
+        "id": 2,
+        "name": "Juan Dela Cruz",
+        "email": "juan@example.com",
+        "role": "alumni",
+        "is_active": 1
+    },
+    {
+        "id": 3,
+        "name": "Maria Santos",
+        "email": "maria@example.com",
+        "role": "alumni",
+        "is_active": 1
+    },
+    {
+        "id": 4,
+        "name": "Antonio Luna",
+        "email": "antonio@example.com",
+        "role": "alumni",
+        "is_active": 1
+    },
+    {
+        "id": 5,
+        "name": "Elena Reyes",
+        "email": "elena@example.com",
+        "role": "alumni",
+        "is_active": 1
+    }
+]

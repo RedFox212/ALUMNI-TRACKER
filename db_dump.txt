@@ -1,0 +1,5 @@
+Alumni Info:
+Email: juan@example.com
+Tests:
+- matches 'password123': NO
+- matches 'password': YES

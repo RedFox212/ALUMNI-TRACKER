@@ -1,0 +1,396 @@
+/* Base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    background-color: #eef2f7;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* Page entrance animation */
+@keyframes fadeSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-slide-in {
+    animation: fadeSlideIn 0.8s ease-out forwards;
+}
+
+/* Card layout */
+.login-container {
+    width: 100%;
+    max-width: 900px;
+    height: 600px;
+    padding: 20px;
+}
+
+.login-card {
+    display: flex;
+    background: #fff;
+    border-radius: 20px;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Left Panel (40%) */
+.left-panel {
+    width: 40%;
+    background: linear-gradient(135deg, #1a3faa 0%, #1e56d9 100%);
+    position: relative;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    color: #fff;
+    overflow: hidden;
+}
+
+/* Floating blobs */
+.blobs {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+}
+
+.blob {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    animation: float 15s infinite ease-in-out;
+}
+
+.blob:nth-child(1) { width: 150px; height: 150px; top: 10%; left: 10%; animation-delay: 0s; }
+.blob:nth-child(2) { width: 100px; height: 100px; bottom: 20%; right: 10%; animation-delay: -5s; }
+.blob:nth-child(3) { width: 120px; height: 120px; top: 50%; left: -20%; animation-delay: -10s; }
+
+@keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(20px, 30px) scale(1.1); }
+}
+
+.content {
+    position: relative;
+    z-index: 1;
+}
+
+/* School Seal Badge */
+.glass-badge {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.school-seal {
+    width: 80%;
+    height: auto;
+}
+
+/* Glow Pulse */
+@keyframes glowPulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3); }
+    70% { box-shadow: 0 0 0 20px rgba(255, 255, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+.pulse-glow {
+    animation: glowPulse 2s infinite;
+}
+
+.welcome-text {
+    font-size: 2.5rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+}
+
+.alumni-text {
+    color: #f5c842;
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: 4px;
+    margin-bottom: 20px;
+}
+
+.system-name {
+    font-size: 0.85rem;
+    font-weight: 300;
+    opacity: 0.9;
+    margin-bottom: 30px;
+}
+
+.motivational-text {
+    font-size: 0.9rem;
+    opacity: 0.7;
+    line-height: 1.6;
+    max-width: 90%;
+    margin: 0 auto;
+}
+
+/* Right Panel (60%) */
+.right-panel {
+    width: 60%;
+    padding: 60px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+}
+
+.form-container {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.signin-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 8px;
+}
+
+.signin-subtitle {
+    font-size: 0.95rem;
+    color: #718096;
+    margin-bottom: 32px;
+}
+
+/* Input Fields */
+.input-group {
+    position: relative;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+}
+
+.input-group .icon {
+    position: absolute;
+    left: 12px;
+    color: #a0aec0;
+    display: flex;
+    align-items: center;
+}
+
+.input-group input {
+    width: 100%;
+    height: 44px;
+    background: #f7fafc;
+    border: none;
+    border-radius: 10px;
+    padding-left: 44px;
+    padding-right: 12px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.input-group input:focus {
+    outline: none;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    border-bottom: 2px solid #2563eb;
+}
+
+/* Password Toggle */
+.toggle-password {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #2563eb;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+/* Options */
+.options-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    font-size: 0.85rem;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #4a5568;
+    cursor: pointer;
+}
+
+.forgot-password {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+/* Sign In Button */
+.signin-btn {
+    width: 100%;
+    height: 44px;
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 22px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, background 0.3s;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.signin-btn:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+}
+
+.signin-btn:active {
+    transform: translateY(0);
+}
+
+/* Idle Pulse */
+@keyframes buttonPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+.signin-btn {
+    animation: buttonPulse 3s infinite ease-in-out;
+}
+
+.signin-btn:focus {
+    animation: none;
+}
+
+/* Loading Spinner */
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.hidden {
+    display: none;
+}
+
+/* Sign Up link */
+.signup-prompt {
+    text-align: center;
+    font-size: 0.9rem;
+    color: #718096;
+}
+
+.signup-link {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* Credential Info Card */
+.credential-info {
+    margin-top: 40px;
+    background: #f1f5f9;
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.credential-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 4px;
+    width: 60px;
+    text-align: center;
+}
+
+.badge.admin { background: #fee2e2; color: #b91c1c; }
+.badge.alumni { background: #dcfce7; color: #15803d; }
+
+code {
+    font-size: 0.8rem;
+    color: #4b5563;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        overflow: auto;
+        height: auto;
+        padding: 20px;
+    }
+    
+    .login-container {
+        height: auto;
+    }
+
+    .login-card {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .left-panel {
+        width: 100%;
+        padding: 60px 40px;
+    }
+
+    .right-panel {
+        width: 100%;
+        padding: 40px 20px;
+    }
+}
