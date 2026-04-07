@@ -39,31 +39,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_job'])) {
 
 // Handle Job Posting
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['post_job'])) {
-    if (!verifyCsrf()) { $error = "Security mismatch."; }
-    else {
-        // Enforce ONE post limit (Pending or Approved)
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM jobs WHERE posted_by = ? AND status != 'rejected'");
-        $stmt->execute([$user_id]);
-        $existing_posts = $stmt->fetchColumn();
+    if ($user_role !== 'admin') { 
+        $error = "Job postings are restricted to administrators. Please send a request via the Request button."; 
+    } elseif (!verifyCsrf()) { 
+        $error = "Security mismatch."; 
+    } else {
+        $title    = trim($_POST['title']);
+        $company  = trim($_POST['company']);
+        $location = trim($_POST['location'] ?? 'Remote');
+        $type     = $_POST['job_type'] ?? 'Full-time';
+        $desc     = trim($_POST['description']);
+        $link     = trim($_POST['apply_link'] ?? '');
 
-        if ($existing_posts > 0 && $user_role !== 'admin') {
-            $error = "You already have an active job listing (pending or approved). Please remove your current one to post again.";
+        if ($title && $company && $desc) {
+            $stmt = $pdo->prepare("INSERT INTO jobs (posted_by, title, company, location, job_type, description, apply_link, is_active, status) VALUES (?,?,?,?,?,?,?,1,'approved')");
+            $stmt->execute([$user_id, $title, $company, $location, $type, $desc, $link]);
+            $success = "Job opportunity posted successfully!";
         } else {
-            $title    = trim($_POST['title']);
-            $company  = trim($_POST['company']);
-            $location = trim($_POST['location'] ?? 'Remote');
-            $type     = $_POST['job_type'] ?? 'Full-time';
-            $desc     = trim($_POST['description']);
-            $link     = trim($_POST['apply_link'] ?? '');
-
-            if ($title && $company && $desc) {
-                // Initial insert sets is_active to 0 so it stays hidden until admin approval
-                $stmt = $pdo->prepare("INSERT INTO jobs (posted_by, title, company, location, job_type, description, apply_link, is_active, status) VALUES (?,?,?,?,?,?,?,0,'pending')");
-                $stmt->execute([$user_id, $title, $company, $location, $type, $desc, $link]);
-                $success = "Job submitted! It will appear on the board after admin approval.";
-            } else {
-                $error = "Please fill in all required fields.";
-            }
+            $error = "Please fill in all required fields.";
         }
     }
 }
@@ -83,18 +76,22 @@ $jobs = $pdo->query("SELECT j.*, u.name as poster_name FROM jobs j JOIN users u 
 <body class="bg-slate-50 min-h-screen flex">
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-64">
+<main class="flex-1 flex flex-col lg:ml-72">
     <?php 
         $topbar_title = 'Job Board';
         $topbar_subtitle = 'Career Opportunities';
-        $topbar_actions = '<button onclick="document.getElementById(\'postJobModal\').classList.add(\'open\')" class="bg-blue-600 text-white text-[10px] font-black px-5 py-2.5 rounded-2xl hover:bg-blue-700 transition-all uppercase tracking-widest shadow-lg shadow-blue-200">Post a Job</button>';
+        if ($user_role === 'admin') {
+            $topbar_actions = '<button onclick="document.getElementById(\'postJobModal\').classList.add(\'open\')" class="bg-blue-600 text-white text-[10px] font-black px-5 py-2.5 rounded-2xl hover:bg-blue-700 transition-all uppercase tracking-widest shadow-lg shadow-blue-200">Post a Job</button>';
+        } else {
+            $topbar_actions = '<button onclick="document.getElementById(\'requestJobModal\').classList.add(\'open\')" class="bg-amber-500 text-white text-[10px] font-black px-5 py-2.5 rounded-2xl hover:bg-amber-600 transition-all uppercase tracking-widest shadow-lg shadow-amber-200">Request a Posting</button>';
+        }
         require_once '../includes/topbar.php'; 
     ?>
 
     <div class="p-8 max-w-6xl mx-auto w-full">
         <div class="mb-10">
             <h1 class="text-3xl font-black text-slate-800 italic">OPPORTUNITIES</h1>
-            <p class="text-slate-400 text-sm font-medium">Find jobs posted by fellow Lyceum Alumni or share openings at your firm.</p>
+            <p class="text-slate-400 text-sm font-medium">Find verified career opportunities from the Lyceum community. Contact Admin to share a job opening.</p>
         </div>
 
         <?php if ($success): ?><div class="mb-6 bg-green-100 text-green-700 p-4 rounded-2xl text-sm font-bold animate-pulse">✅ <?php echo $success; ?></div><?php endif; ?>
@@ -156,7 +153,7 @@ $jobs = $pdo->query("SELECT j.*, u.name as poster_name FROM jobs j JOIN users u 
             <div class="col-span-full py-20 text-center bg-white rounded-[40px] border-2 border-dashed border-slate-200">
                 <div class="text-5xl mb-4">🚀</div>
                 <h3 class="text-xl font-bold text-slate-800">No jobs posted yet</h3>
-                <p class="text-slate-400">Be the first to share an opportunity with your network!</p>
+                <p class="text-slate-400">Wait for the Administrator to post new opportunities.</p>
             </div>
             <?php endif; ?>
         </div>
@@ -209,6 +206,37 @@ $jobs = $pdo->query("SELECT j.*, u.name as poster_name FROM jobs j JOIN users u 
     </div>
 </div>
 
-<script>document.getElementById('postJobModal').addEventListener('click', e=> { if(e.target===e.currentTarget) e.currentTarget.classList.remove('open'); });</script>
+<!-- Request Job Modal (For Alumni) -->
+<div id="requestJobModal" class="modal fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 items-center justify-center p-4">
+    <div class="bg-white rounded-[40px] w-full max-w-lg shadow-2xl overflow-hidden">
+        <div class="bg-amber-500 p-8 text-white text-center">
+            <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span class="text-3xl">✉️</span>
+            </div>
+            <h2 class="text-2xl font-black italic tracking-tighter uppercase">Request Job Posting</h2>
+            <p class="text-amber-100 text-sm mt-1">Found a job opportunity? Send the details to the Admin.</p>
+        </div>
+        <div class="p-8 space-y-6 text-center">
+            <p class="text-slate-600 font-medium">To maintain a high-quality job board, all postings are now handled exclusively by the Administrators.</p>
+            <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100 text-left">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">How to Request:</p>
+                <div class="space-y-2 text-xs font-bold text-slate-700">
+                    <p>• Include Job Title & Company</p>
+                    <p>• Provide a direct application link</p>
+                    <p>• Attach a brief job description</p>
+                </div>
+            </div>
+            <a href="mailto:admin@lyceumalabang.edu.ph?subject=Job%20Posting%20Request" class="w-full py-4 bg-slate-900 text-white rounded-2xl font-black shadow-lg hover:bg-slate-800 transition-all block">
+                MESSAGE ADMINISTRATOR
+            </a>
+            <button type="button" onclick="document.getElementById('requestJobModal').classList.remove('open')" class="text-slate-400 text-xs font-bold hover:text-slate-600">NOT NOW</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('postJobModal').addEventListener('click', e=> { if(e.target===e.currentTarget) e.currentTarget.classList.remove('open'); });
+    document.getElementById('requestJobModal').addEventListener('click', e=> { if(e.target===e.currentTarget) e.currentTarget.classList.remove('open'); });
+</script>
 </body>
 </html>

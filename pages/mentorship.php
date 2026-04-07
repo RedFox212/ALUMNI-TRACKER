@@ -25,7 +25,7 @@ $stmt->execute([$user_id]);
 $my_status = $stmt->fetch();
 
 // Fetch approved mentors for the directory
-$mentors = $pdo->query("SELECT u.name, a.program, a.batch_year, a.mentor_bio, a.job_title 
+$mentors = $pdo->query("SELECT u.name, a.program, a.batch_year, a.mentor_bio, a.job_title, a.company, a.years_experience 
                         FROM users u 
                         JOIN alumni a ON u.id = a.user_id 
                         WHERE a.mentor_status = 'approved' 

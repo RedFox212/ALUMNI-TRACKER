@@ -54,10 +54,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Filters
 $search_q  = trim($_GET['search'] ?? '');
 $role_f    = $_GET['role'] ?? '';
-$query     = "SELECT * FROM users WHERE 1=1";
+$batch_f   = $_GET['batch'] ?? '';
+$program_f = $_GET['program'] ?? '';
+
+$query     = "SELECT u.*, a.batch_year, a.program 
+              FROM users u 
+              LEFT JOIN alumni a ON u.id = a.user_id 
+              WHERE 1=1";
 $params    = [];
-if ($search_q) { $query .= " AND (name LIKE ? OR email LIKE ?)"; $params[] = "%$search_q%"; $params[] = "%$search_q%"; }
-if ($role_f)   { $query .= " AND role = ?"; $params[] = $role_f; }
+
+if ($search_q) { $query .= " AND (u.name LIKE ? OR u.email LIKE ?)"; $params[] = "%$search_q%"; $params[] = "%$search_q%"; }
+if ($role_f)   { $query .= " AND u.role = ?"; $params[] = $role_f; }
+if ($batch_f)  { $query .= " AND a.batch_year = ?"; $params[] = $batch_f; }
+if ($program_f){ $query .= " AND a.program = ?"; $params[] = $program_f; }
+
 $query .= " ORDER BY created_at DESC";
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
@@ -78,7 +88,7 @@ $role_colors = ['admin'=>'bg-red-100 text-red-600','alumni'=>'bg-green-100 text-
 
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-64">
+<main class="flex-1 flex flex-col lg:ml-72">
     <header class="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
         <div class="flex items-center gap-3 text-slate-400">
             <span class="text-sm font-medium text-slate-800 uppercase tracking-tighter">Manage Users</span>
@@ -105,11 +115,27 @@ $role_colors = ['admin'=>'bg-red-100 text-red-600','alumni'=>'bg-green-100 text-
                 <input type="text" name="search" value="<?php echo htmlspecialchars($search_q); ?>" placeholder="Search name or email..."
                     class="w-full h-12 bg-slate-50 rounded-2xl pl-12 pr-4 outline-none focus:ring-4 focus:ring-blue-100 text-sm transition-all border border-transparent focus:border-blue-200">
             </div>
-            <select name="role" class="h-12 bg-slate-50 rounded-2xl px-6 outline-none focus:ring-4 focus:ring-blue-100 text-sm cursor-pointer min-w-44 border border-transparent focus:border-blue-200 transition-all">
+            <select name="role" class="h-12 bg-slate-50 rounded-2xl px-6 outline-none focus:ring-4 focus:ring-blue-100 text-[11px] font-black uppercase tracking-widest cursor-pointer min-w-44 border border-transparent focus:border-blue-200 transition-all">
                 <option value="">All Roles</option>
                 <option value="admin"  <?php echo $role_f==='admin'  ?'selected':'';?>>Admin</option>
                 <option value="alumni" <?php echo $role_f==='alumni' ?'selected':'';?>>Alumni</option>
                 <option value="officer"<?php echo $role_f==='officer'?'selected':'';?>>Officer</option>
+            </select>
+
+            <select name="program" class="h-12 bg-slate-50 rounded-2xl px-6 outline-none focus:ring-4 focus:ring-blue-100 text-[11px] font-black uppercase tracking-widest cursor-pointer min-w-44 border border-transparent focus:border-blue-200 transition-all">
+                <option value="">All Programs</option>
+                <?php 
+                $progs = $pdo->query("SELECT DISTINCT program FROM alumni WHERE program IS NOT NULL ORDER BY program")->fetchAll(PDO::FETCH_COLUMN);
+                foreach($progs as $p): ?>
+                    <option value="<?php echo $p; ?>" <?php echo $program_f===$p?'selected':''; ?>><?php echo $p; ?></option>
+                <?php endforeach; ?>
+            </select>
+
+            <select name="batch" class="h-12 bg-slate-50 rounded-2xl px-6 outline-none focus:ring-4 focus:ring-blue-100 text-[11px] font-black uppercase tracking-widest cursor-pointer min-w-32 border border-transparent focus:border-blue-200 transition-all">
+                <option value="">All Batches</option>
+                <?php for($y=2026; $y>=2004; $y--): ?>
+                    <option value="<?php echo $y; ?>" <?php echo $batch_f==$y?'selected':''; ?>><?php echo $y; ?></option>
+                <?php endfor; ?>
             </select>
             <div class="flex gap-3">
                 <button type="submit" class="h-12 px-8 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 text-sm transition-all shadow-lg shadow-blue-100 active:scale-95">Filter</button>
@@ -140,7 +166,13 @@ $role_colors = ['admin'=>'bg-red-100 text-red-600','alumni'=>'bg-green-100 text-
                                 <?php echo renderAvatar($u['name'], 'w-12 h-12 flex-shrink-0 shadow-sm border-2 border-white'); ?>
                                 <div>
                                     <p class="font-black text-slate-800 text-sm"><?php echo htmlspecialchars($u['name']); ?></p>
-                                    <p class="text-xs text-slate-400 font-medium"><?php echo htmlspecialchars($u['email']); ?></p>
+                                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                        <?php if ($u['role'] === 'alumni' && $u['program']): ?>
+                                            Class of <?php echo $u['batch_year']; ?> • <?php echo htmlspecialchars($u['program']); ?>
+                                        <?php else: ?>
+                                            <?php echo htmlspecialchars($u['email']); ?>
+                                        <?php endif; ?>
+                                    </p>
                                 </div>
                             </div>
                         </td>

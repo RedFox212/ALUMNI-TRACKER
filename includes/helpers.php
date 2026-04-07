@@ -36,12 +36,25 @@ function getAvatar($name) {
 }
 
 /**
- * Render Avatar Circle
+ * Render Avatar Circle or Image
  */
-function renderAvatar($name, $size = 'w-10 h-10') {
+function renderAvatar($name, $size = 'w-10 h-10', $profile_pic = null) {
+    if (!empty($profile_pic)) {
+        // Path check (uploads are stored relative to root)
+        $path = __DIR__ . '/../' . $profile_pic;
+        if (file_exists($path)) {
+            return sprintf(
+                '<img src="/ALUMNI-main/%s" class="%s rounded-full object-cover shadow-sm border border-slate-200 dark:border-slate-800" alt="%s">',
+                htmlspecialchars($profile_pic),
+                $size,
+                htmlspecialchars($name)
+            );
+        }
+    }
+
     $avatar = getAvatar($name);
     return sprintf(
-        '<div class="%s rounded-full flex items-center justify-center text-white font-bold" style="background-color: %s;">%s</div>',
+        '<div class="%s rounded-full flex items-center justify-center text-white font-bold shadow-sm" style="background-color: %s;">%s</div>',
         $size,
         $avatar['color'],
         $avatar['initials']

@@ -38,7 +38,7 @@ $events = $pdo->query("SELECT *, (SELECT status FROM event_rsvps WHERE event_id 
 <body class="bg-slate-50 transition-colors duration-500 min-h-screen">
     <?php require_once '../includes/sidebar.php'; ?>
 
-    <main class="flex-1 flex flex-col lg:ml-64">
+    <main class="flex-1 flex flex-col lg:ml-72">
         <?php 
             $topbar_title = 'Event Tracker';
             $topbar_subtitle = count($events) . ' Total Gatherings';

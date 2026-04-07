@@ -32,8 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate_id'])) {
                 $next = $max + 1;
                 $new_id = "LOA-$year-" . str_pad($next, 5, '0', STR_PAD_LEFT);
                 
-                // Update
-                $pdo->prepare("UPDATE alumni SET alumni_id_num = ?, verification_status = 'verified' WHERE user_id = ?")
+                // Update ONLY if it's currently NULL and use LIMIT 1 for safety
+                $pdo->prepare("UPDATE alumni SET alumni_id_num = ?, verification_status = 'verified' WHERE user_id = ? AND (alumni_id_num IS NULL OR alumni_id_num = '') LIMIT 1")
                     ->execute([$new_id, $target_user_id]);
                 
                 // Notify user
@@ -70,7 +70,7 @@ $verified = $pdo->query("SELECT u.id, u.name, a.alumni_id_num, a.batch_year, a.p
 <body class="bg-slate-50 min-h-screen flex">
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-64">
+<main class="flex-1 flex flex-col lg:ml-72">
     <?php 
         $topbar_title = 'Identity Manager';
         $topbar_subtitle = 'Institutional Credential Governance';

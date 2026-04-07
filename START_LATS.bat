@@ -12,13 +12,13 @@ echo.
 echo  [IMPORTANT] Make sure Apache and MySQL are STARTED 
 echo  in your XAMPP Control Panel.
 echo.
-echo  Link: http://localhost/ALUMNI
+echo  Link: http://localhost/ALUMNI-main
 echo.
 echo  Launching portal in your default browser...
 echo.
 
 :: Open default browser
-start http://localhost/ALUMNI
+start http://localhost/ALUMNI-main
 
 echo.
 echo  Portal Launched!

@@ -101,7 +101,7 @@ $alumni_list = $pdo->query("SELECT u.id, u.name, a.program, a.batch_year FROM us
 <body class="bg-slate-50 min-h-screen flex">
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-64">
+<main class="flex-1 flex flex-col lg:ml-72">
     <header class="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
         <div class="flex items-center gap-3 text-slate-400">
             <span class="text-sm font-medium text-slate-800 uppercase tracking-tighter">Manage Spotlights</span>

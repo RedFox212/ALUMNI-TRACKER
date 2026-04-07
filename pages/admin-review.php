@@ -31,27 +31,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
             logAudit("ALUMNI_VERIFY", "Identity was " . $decision, "alumni", $id);
             $success = "Alumni identity " . strtoupper($decision) . ".";
-        } elseif ($type === 'mentor') {
-            $stmt = $pdo->prepare("UPDATE alumni SET mentor_status = ?, is_mentor = ? WHERE id = ?");
-            $stmt->execute([$decision, ($decision === 'approved' ? 1 : 0), $id]);
-            logAudit("MENTOR_DECISION", "Mentorship status updated to " . $decision, "alumni", $id);
-            $success = "Mentorship request " . strtoupper($decision) . ".";
-        } elseif ($type === 'business') {
-            $stmt = $pdo->prepare("UPDATE businesses SET status = ? WHERE id = ?");
-            $stmt->execute([$decision, $id]);
-            logAudit("BIZ_MODERATION", "Business listing moderated as " . $decision, "business", $id);
-            $success = "Business listing " . strtoupper($decision) . ".";
         } elseif ($type === 'spotlight') {
             $stmt = $pdo->prepare("UPDATE announcements SET status = ? WHERE id = ?");
             $stmt->execute([$decision, $id]);
             logAudit("SPOTLIGHT_MODERATION", "Post/Spotlight moderated as " . $decision, "announcement", $id);
             $success = "Spotlight/Post moderation " . strtoupper($decision) . ".";
-        } elseif ($type === 'job') {
-            $status = ($decision === 'approved' ? 1 : 0);
-            $stmt = $pdo->prepare("UPDATE jobs SET is_active = ?, status = ? WHERE id = ?");
-            $stmt->execute([$status, $decision, $id]);
-            logAudit("JOB_MODERATION", "Job posting moderated as " . $decision, "job", $id);
-            $success = "Job posting " . strtoupper($decision) . ".";
+            $success = "Spotlight/Post moderation " . strtoupper($decision) . ".";
         }
     }
 }
@@ -60,14 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $pending = [];
 if ($tab === 'alumni') {
     $pending = $pdo->query("SELECT u.name, a.* FROM users u JOIN alumni a ON u.id = a.user_id WHERE a.verification_status = 'pending' ORDER BY a.created_at ASC")->fetchAll();
-} elseif ($tab === 'mentor') {
-    $pending = $pdo->query("SELECT u.name, a.* FROM users u JOIN alumni a ON u.id = a.user_id WHERE a.mentor_status = 'pending' ORDER BY a.created_at ASC")->fetchAll();
-} elseif ($tab === 'business') {
-    $pending = $pdo->query("SELECT u.name as owner_name, b.* FROM users u JOIN businesses b ON u.id = b.owner_id WHERE b.status = 'pending' ORDER BY b.created_at ASC")->fetchAll();
 } elseif ($tab === 'spotlight') {
     $pending = $pdo->query("SELECT u.name, an.* FROM users u JOIN announcements an ON u.id = an.created_by WHERE an.status = 'pending' ORDER BY an.created_at ASC")->fetchAll();
-} elseif ($tab === 'jobs') {
-    $pending = $pdo->query("SELECT u.name, j.* FROM users u JOIN jobs j ON u.id = j.posted_by WHERE j.status = 'pending' ORDER BY j.created_at ASC")->fetchAll();
 }
 ?>
 <!DOCTYPE html>
@@ -82,16 +61,13 @@ if ($tab === 'alumni') {
 <body class="bg-slate-50 transition-colors duration-500">
     <?php require_once '../includes/sidebar.php'; ?>
 
-    <main class="flex-1 flex flex-col lg:ml-64">
+    <main class="flex-1 flex flex-col lg:ml-72">
         <?php $topbar_title = 'Review Center'; $topbar_subtitle = 'Global Moderation & Identity Control'; require_once '../includes/topbar.php'; ?>
 
         <div class="p-8 max-w-5xl mx-auto w-full">
             <!-- Tabs -->
             <div class="flex gap-6 p-3 bg-slate-100 dark:bg-slate-900 rounded-[40px] mb-12 w-fit">
                 <a href="?tab=alumni" class="px-10 py-4 rounded-[32px] text-[11px] font-black tracking-[2px] uppercase transition-all <?php echo $tab === 'alumni' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'; ?>">Waitlist</a>
-                <a href="?tab=mentor" class="px-10 py-4 rounded-[32px] text-[11px] font-black tracking-[2px] uppercase transition-all <?php echo $tab === 'mentor' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'; ?>">Mentorship</a>
-                <a href="?tab=business" class="px-10 py-4 rounded-[32px] text-[11px] font-black tracking-[2px] uppercase transition-all <?php echo $tab === 'business' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'; ?>">Enterprises</a>
-                <a href="?tab=jobs" class="px-10 py-4 rounded-[32px] text-[11px] font-black tracking-[2px] uppercase transition-all <?php echo $tab === 'jobs' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'; ?>">Career Board</a>
                 <a href="?tab=spotlight" class="px-10 py-4 rounded-[32px] text-[11px] font-black tracking-[2px] uppercase transition-all <?php echo $tab === 'spotlight' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'; ?>">Spotlights</a>
                 <a href="?tab=logs" class="px-10 py-4 rounded-[32px] text-[11px] font-black tracking-[2px] uppercase transition-all <?php echo $tab === 'logs' ? 'bg-white dark:bg-slate-800 text-blue-600 shadow-xl' : 'text-slate-400 hover:text-slate-600'; ?>">System History</a>
             </div>

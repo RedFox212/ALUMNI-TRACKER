@@ -1,0 +1,13 @@
+User-agent: *
+Disallow: /includes/
+Disallow: /uploads/
+Disallow: /pages/
+Disallow: /pages/dashboard.php
+Disallow: /pages/edit-profile.php
+Disallow: /pages/directory.php
+Disallow: /pages/manage-users.php
+Disallow: /pages/admin-review.php
+
+Allow: /index.php
+Allow: /setup-profile.php
+Allow: /loalogo.png

@@ -46,7 +46,7 @@ $verify_url = "http://" . $_SERVER['HTTP_HOST'] . $verify_path . "?id=" . ($alum
 <body class="bg-slate-50 transition-colors duration-500 min-h-screen">
     <?php require_once '../includes/sidebar.php'; ?>
 
-    <main class="flex-1 flex flex-col lg:ml-64">
+    <main class="flex-1 flex flex-col lg:ml-72">
         <?php $topbar_title = 'Digital Identity'; $topbar_subtitle = 'Institutional Credential Tracking'; require_once '../includes/topbar.php'; ?>
 
         <div class="p-8 flex flex-col items-center justify-center flex-1">

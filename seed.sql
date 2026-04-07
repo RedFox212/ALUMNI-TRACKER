@@ -40,12 +40,16 @@ CREATE TABLE IF NOT EXISTS alumni (
 
 -- Batch Officers table
 CREATE TABLE IF NOT EXISTS batch_officers (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    batch_year INT NOT NULL,
-    user_id INT,
-    officer_role ENUM('president', 'vp', 'secretary', 'treasurer', 'pro') NOT NULL,
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    user_id     INT NOT NULL,
+    position    VARCHAR(100) DEFAULT NULL,
+    batch_year  YEAR DEFAULT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_user (user_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 
 -- Polls table
 CREATE TABLE IF NOT EXISTS polls (

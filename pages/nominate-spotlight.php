@@ -76,7 +76,7 @@ $status_styles = [
 
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-64">
+<main class="flex-1 flex flex-col lg:ml-72">
     <header class="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
         <div class="flex items-center gap-3 text-slate-400">
             <a href="dashboard.php" class="text-slate-400 hover:text-slate-600 transition-all">

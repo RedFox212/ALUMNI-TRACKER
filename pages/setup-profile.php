@@ -8,6 +8,7 @@ requireLogin();
 
 $user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'] ?? 'alumni';
+$error = null;
 
 // Admins never need to set up an alumni profile
 if ($user_role === 'admin') {

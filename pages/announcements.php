@@ -5,12 +5,23 @@ require_once '../includes/db.php';
 require_once '../includes/helpers.php';
 
 requireLogin();
-if ($_SESSION['user_role'] !== 'admin') {
-    header('Location: dashboard.php'); exit;
-}
-
 $user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['user_role'] ?? 'alumni';
 $success = $error = null;
+
+// Handle RSVP (New Consolidated Logic)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rsvp'])) {
+    if (!verifyCsrf()) { $error = "Security mismatch."; }
+    else {
+        $ev_id  = (int)$_POST['event_id'];
+        $status = $_POST['status'] ?? 'Going';
+        $stmt = $pdo->prepare("INSERT INTO event_rsvps (event_id, user_id, status) VALUES (?,?,?) 
+                               ON DUPLICATE KEY UPDATE status = VALUES(status)");
+        if ($stmt->execute([$ev_id, $user_id])) {
+            $success = "RSVP Updated for event!";
+        }
+    }
+}
 
 // Ensure schema is updated for Category
 try {
@@ -19,7 +30,8 @@ try {
 
 // Handle POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!verifyCsrf()) { $error = "Security mismatch."; }
+    if ($user_role !== 'admin') { $error = "Unauthorized action."; }
+    elseif (!verifyCsrf()) { $error = "Security mismatch."; }
     else {
         $title          = trim($_POST['title'] ?? '');
         $body           = trim($_POST['body']  ?? '');
@@ -44,15 +56,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $notif = $pdo->prepare("INSERT INTO notifications (user_id, type, message) VALUES (?, 'system', ?)");
             foreach ($users as $uid) { $notif->execute([$uid, $notif_text]); }
 
-            $success = "Successfully broadcasted as " . strtoupper($category) . " to " . count($users) . " alumni!";
+            $success = "Successfully posted as " . strtoupper($category) . " to " . count($users) . " alumni!";
         } else {
             $error = "Title and body are required.";
         }
     }
 }
 
-// Fetch history
-$announcements = $pdo->query("SELECT a.*, u.name AS author FROM announcements a JOIN users u ON a.created_by = u.id ORDER BY a.created_at DESC LIMIT 50")->fetchAll();
+// Fetch history (with RSVP status for events)
+$announcements = $pdo->query("
+    SELECT a.*, u.name AS author,
+    (SELECT status FROM event_rsvps WHERE event_id = a.id AND user_id = $user_id) as my_rsvp
+    FROM announcements a 
+    JOIN users u ON a.created_by = u.id 
+    ORDER BY a.created_at DESC LIMIT 50
+")->fetchAll();
 $batches  = $pdo->query("SELECT DISTINCT batch_year FROM alumni ORDER BY batch_year DESC")->fetchAll(PDO::FETCH_COLUMN);
 $programs = $pdo->query("SELECT DISTINCT program FROM alumni ORDER BY program")->fetchAll(PDO::FETCH_COLUMN);
 ?>
@@ -60,7 +78,7 @@ $programs = $pdo->query("SELECT DISTINCT program FROM alumni ORDER BY program")-
 <html lang="en">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Broadcasting – LATS Admin</title>
+    <title>Announcements – LATS Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>body{font-family:'Inter',sans-serif;}</style>
@@ -68,25 +86,30 @@ $programs = $pdo->query("SELECT DISTINCT program FROM alumni ORDER BY program")-
 <body class="bg-slate-50 min-h-screen flex">
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-64">
-    <header class="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
+<main class="flex-1 flex flex-col lg:ml-72">
+    <header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 flex items-center justify-between sticky top-0 z-30 transition-all">
         <div class="flex items-center gap-3 text-slate-400">
-            <span class="text-sm font-medium text-slate-800 uppercase tracking-tighter">Communications</span>
-            <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
-            <span class="text-xs">Institutional Broadcasting Hub</span>
+            <span class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tighter"><?php echo $user_role === 'admin' ? 'Communications' : 'Alumni News'; ?></span>
+            <span class="w-1 h-1 bg-slate-200 dark:bg-slate-700 rounded-full"></span>
+            <span class="text-xs italic"><?php echo $user_role === 'admin' ? 'Institutional Hub' : 'Latest Updates'; ?></span>
         </div>
     </header>
 
     <div class="p-8 max-w-6xl mx-auto w-full">
-        <div class="mb-10">
-            <h1 class="text-3xl font-black text-slate-800 italic uppercase tracking-tighter">BROADCAST CENTER</h1>
-            <p class="text-slate-400 text-sm font-medium">Issue official announcements and scheduled alumni events.</p>
+        <div class="mb-10 <?php echo $user_role !== 'admin' ? 'text-center' : ''; ?>">
+            <h1 class="text-3xl font-black text-slate-800 dark:text-white italic uppercase tracking-tighter">
+                <?php echo $user_role === 'admin' ? 'ANNOUNCEMENT CENTER' : 'LATEST NEWS & UPDATES'; ?>
+            </h1>
+            <p class="text-slate-400 dark:text-slate-500 text-sm font-medium">
+                <?php echo $user_role === 'admin' ? 'Issue official announcements and scheduled alumni events.' : 'Stay connected with formal institutional messages and upcoming events.'; ?>
+            </p>
         </div>
 
         <?php if ($success): ?><div class="mb-6 bg-blue-50 text-blue-700 p-4 rounded-2xl text-sm font-bold border border-blue-100 italic">✅ <?php echo $success; ?></div><?php endif; ?>
         <?php if ($error): ?><div class="mb-6 bg-red-100 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100">⚠️ <?php echo $error; ?></div><?php endif; ?>
 
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <?php if ($user_role === 'admin'): ?>
             <!-- Composer -->
             <div class="lg:col-span-2">
                 <div class="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
@@ -137,34 +160,54 @@ $programs = $pdo->query("SELECT DISTINCT program FROM alumni ORDER BY program")-
                                 <?php foreach ($programs as $p): ?><option><?php echo $p; ?></option><?php endforeach; ?>
                             </select>
                         </div>
-                        <button type="submit" class="w-full h-14 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all uppercase tracking-widest text-xs">Broadcast Now</button>
+                        <button type="submit" class="w-full h-14 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all uppercase tracking-widest text-xs">Post Announcement</button>
                     </form>
                 </div>
             </div>
+            <?php endif; ?>
 
             <!-- News Feed / Logs -->
-            <div class="lg:col-span-3 space-y-6">
-                <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[3px] mb-4">Transmission History</h2>
-                <div class="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden divide-y divide-slate-50">
+            <div class="<?php echo ($user_role === 'admin') ? 'lg:col-span-3' : 'lg:col-span-5 max-w-4xl mx-auto'; ?> space-y-6">
+                <h2 class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[3px] mb-4 <?php echo $user_role !== 'admin' ? 'text-center' : ''; ?>">
+                    <?php echo $user_role === 'admin' ? 'Announcement History' : 'TODAY\'S FEED'; ?>
+                </h2>
+                <div class="bg-white dark:bg-slate-900 rounded-[40px] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden divide-y divide-slate-50 dark:divide-slate-800/50 transition-all">
                     <?php if (empty($announcements)): ?>
-                        <p class="p-12 text-center text-xs text-slate-300 italic">No transmissions recorded.</p>
+                        <p class="p-12 text-center text-xs text-slate-300 italic">No announcements recorded.</p>
                     <?php endif; ?>
                     <?php foreach ($announcements as $ann): ?>
-                    <div class="p-8 hover:bg-slate-50 transition-colors group">
+                    <div class="p-8 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                         <div class="flex items-start justify-between gap-6">
                             <div class="flex-1">
                                 <div class="flex items-center gap-2 mb-2">
-                                    <span class="px-3 py-1 text-[8px] font-black rounded-full uppercase tracking-widest <?php echo $ann['category']==='Event' ? 'bg-rose-50 text-rose-500' : 'bg-blue-50 text-blue-600'; ?>">
+                                    <span class="px-3 py-1 text-[8px] font-black rounded-full uppercase tracking-widest <?php echo $ann['category']==='Event' ? 'bg-rose-50 dark:bg-rose-900/30 text-rose-500' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600'; ?>">
                                         <?php echo $ann['category']; ?>
                                     </span>
-                                    <span class="text-[9px] font-black text-slate-300 uppercase tracking-[2px]"><?php echo strtoupper($ann['scope']); ?></span>
+                                    <span class="text-[9px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-[2px]"><?php echo strtoupper($ann['scope']); ?></span>
                                 </div>
-                                <h3 class="text-lg font-black text-slate-800 uppercase tracking-tighter italic group-hover:text-blue-600 transition-colors"><?php echo htmlspecialchars($ann['title']); ?></h3>
-                                <p class="text-slate-400 text-xs mt-2 leading-relaxed italic"><?php echo nl2br(htmlspecialchars($ann['body'])); ?></p>
+                                <h3 class="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tighter italic group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"><?php echo htmlspecialchars($ann['title']); ?></h3>
+                                <p class="text-slate-400 dark:text-slate-500 text-xs mt-2 leading-relaxed italic"><?php echo nl2br(htmlspecialchars($ann['body'])); ?></p>
+                                
+                                <?php if ($ann['category'] === 'Event'): ?>
+                                <div class="mt-6 flex flex-wrap items-center gap-2">
+                                    <form method="POST" class="flex gap-1.5 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                        <?php echo csrfField(); ?>
+                                        <input type="hidden" name="event_id" value="<?php echo $ann['id']; ?>">
+                                        <input type="hidden" name="rsvp" value="1">
+                                        
+                                        <button type="submit" name="status" value="Going" class="px-4 h-8 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all <?php echo $ann['my_rsvp'] === 'Going' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'; ?>">Going</button>
+                                        <button type="submit" name="status" value="Maybe" class="px-4 h-8 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all <?php echo $ann['my_rsvp'] === 'Maybe' ? 'bg-amber-600/20 text-amber-600 dark:text-amber-400 border border-amber-500/20' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'; ?>">Maybe</button>
+                                        <button type="submit" name="status" value="Declined" class="px-4 h-8 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all <?php echo $ann['my_rsvp'] === 'Declined' ? 'bg-red-600/20 text-red-600 dark:text-red-400 border border-red-500/20' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'; ?>">Skip</button>
+                                    </form>
+                                    <?php if ($ann['my_rsvp']): ?>
+                                        <span class="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest ml-2 animate-pulse">Confirmed!</span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
                             </div>
                             <div class="text-right">
-                                <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-1"><?php echo date('M d', strtotime($ann['created_at'])); ?></p>
-                                <p class="text-[8px] font-bold text-slate-400 uppercase">by <?php echo htmlspecialchars($ann['author']); ?></p>
+                                <p class="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest mb-1"><?php echo date('M d', strtotime($ann['created_at'])); ?></p>
+                                <p class="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase italic">via <?php echo htmlspecialchars($ann['author']); ?></p>
                             </div>
                         </div>
                     </div>

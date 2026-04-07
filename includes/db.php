@@ -9,23 +9,29 @@ try {
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
     ]);
 
-    // Check if database exists
-    $stmt = $temp_pdo->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '" . DB_NAME . "'");
-    $exists = $stmt->fetchColumn();
+    // Check if database and core tables exist
+    $stmt = $temp_pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users'");
+    $stmt->execute([DB_NAME]);
+    $users_table_exists = $stmt->fetchColumn();
 
-    if (!$exists) {
+    if (!$users_table_exists) {
+        // Ensure database exists
+        $temp_pdo->exec("CREATE DATABASE IF NOT EXISTS " . DB_NAME);
+        $temp_pdo->exec("USE " . DB_NAME);
+
         // Auto-import seed.sql
         $seed_file = __DIR__ . '/../seed.sql';
         if (file_exists($seed_file)) {
-            $temp_pdo->exec("CREATE DATABASE " . DB_NAME);
-            $temp_pdo->exec("USE " . DB_NAME);
-            
             $sql = file_get_contents($seed_file);
-            // Simple split by semicolon (careful with triggers/stored procs, but okay for LATS schema)
+            // Simple split by semicolon
             $queries = array_filter(array_map('trim', explode(';', $sql)));
             foreach ($queries as $query) {
                 if (!empty($query)) {
-                    $temp_pdo->exec($query);
+                    try {
+                        $temp_pdo->exec($query);
+                    } catch (Exception $e) {
+                        // Skip if table exists error (though handled by IF NOT EXISTS usually)
+                    }
                 }
             }
         }
@@ -41,8 +47,8 @@ try {
     $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
 
     // Auto-migrate: ensure new tables exist on existing DB (safe to run repeatedly)
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS batch_officers (
+    $migration_queries = [
+        "CREATE TABLE IF NOT EXISTS batch_officers (
             id          INT AUTO_INCREMENT PRIMARY KEY,
             user_id     INT NOT NULL,
             position    VARCHAR(100) DEFAULT NULL,
@@ -51,9 +57,9 @@ try {
             updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uq_user (user_id),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-        CREATE TABLE IF NOT EXISTS jobs (
+        "CREATE TABLE IF NOT EXISTS jobs (
             id          INT AUTO_INCREMENT PRIMARY KEY,
             posted_by   INT NOT NULL,
             title       VARCHAR(255) NOT NULL,
@@ -66,9 +72,9 @@ try {
             is_active   TINYINT(1) DEFAULT 1,
             created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (posted_by) REFERENCES users(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-        CREATE TABLE IF NOT EXISTS businesses (
+        "CREATE TABLE IF NOT EXISTS businesses (
             id          INT AUTO_INCREMENT PRIMARY KEY,
             owner_id    INT NOT NULL,
             biz_name    VARCHAR(255) NOT NULL,
@@ -80,9 +86,9 @@ try {
             is_verified TINYINT(1) DEFAULT 0,
             created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
 
-        CREATE TABLE IF NOT EXISTS event_rsvps (
+        "CREATE TABLE IF NOT EXISTS event_rsvps (
             id          INT AUTO_INCREMENT PRIMARY KEY,
             event_id    INT NOT NULL,
             user_id     INT NOT NULL,
@@ -90,8 +96,17 @@ try {
             created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uq_rsvp (event_id, user_id),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    ");
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+    ];
+
+    foreach ($migration_queries as $q) {
+        try {
+            $pdo->exec($q);
+        } catch (Exception $e) {
+            // Log or handle individual migration failure
+        }
+    }
+
 
     // Fix for existing tables missing new columns
     // Separate individual try blocks to ensure one missing feature doesn't block the rest
@@ -106,10 +121,27 @@ try {
 
     // 8. Verification for Annoucements/Spotlights (Moderation)
     try { $pdo->exec("ALTER TABLE announcements ADD COLUMN status ENUM('pending', 'verified', 'rejected') DEFAULT 'verified'"); } catch(Exception $e){}
+    try {
+        $check = $pdo->query("SHOW COLUMNS FROM announcements LIKE 'category'");
+        if (!$check->fetch()) {
+            $pdo->exec("ALTER TABLE announcements ADD COLUMN category VARCHAR(50) DEFAULT 'General' AFTER title");
+        }
+    } catch(Exception $e){}
 
     // Add mentorship columns to alumni
-    try { $pdo->exec("ALTER TABLE alumni ADD COLUMN mentor_status ENUM('none','pending','approved','declined') DEFAULT 'none' AFTER is_mentor"); } catch(Exception $e){}
-    try { $pdo->exec("ALTER TABLE alumni ADD COLUMN mentor_bio TEXT DEFAULT NULL AFTER mentor_status"); } catch(Exception $e){}
+    try { 
+        $mentorship_cols = [
+            'is_mentor' => "TINYINT(1) DEFAULT 0",
+            'mentor_status' => "ENUM('none','pending','approved','declined') DEFAULT 'none'",
+            'mentor_bio' => "TEXT DEFAULT NULL"
+        ];
+        foreach ($mentorship_cols as $col => $def) {
+            $check = $pdo->query("SHOW COLUMNS FROM alumni LIKE '$col'");
+            if (!$check->fetch()) {
+                $pdo->exec("ALTER TABLE alumni ADD COLUMN $col $def");
+            }
+        }
+    } catch(Exception $e){}
     
     // 9. Audit Logs (Security Tracking)
     $pdo->exec("CREATE TABLE IF NOT EXISTS audit_logs (
@@ -140,6 +172,25 @@ try {
         $stmt2 = $pdo->query("SHOW COLUMNS FROM alumni LIKE 'skills'");
         if (!$stmt2->fetch()) {
             $pdo->exec("ALTER TABLE alumni ADD COLUMN skills TEXT DEFAULT NULL");
+        }
+
+        // Add detailed registration columns
+        $reg_columns = [
+            'first_name' => "VARCHAR(100) DEFAULT NULL AFTER user_id",
+            'last_name' => "VARCHAR(100) DEFAULT NULL AFTER first_name",
+            'middle_name' => "VARCHAR(100) DEFAULT NULL AFTER last_name",
+            'gender' => "ENUM('Male', 'Female', 'Other') DEFAULT NULL AFTER middle_name",
+            'degree' => "VARCHAR(100) DEFAULT NULL AFTER gender",
+            'college' => "VARCHAR(100) DEFAULT NULL AFTER degree",
+            'masteral' => "VARCHAR(255) DEFAULT NULL AFTER advanced_degree",
+            'doctorate' => "VARCHAR(255) DEFAULT NULL AFTER masteral"
+        ];
+
+        foreach ($reg_columns as $col => $definition) {
+            $check = $pdo->query("SHOW COLUMNS FROM alumni LIKE '$col'");
+            if (!$check->fetch()) {
+                $pdo->exec("ALTER TABLE alumni ADD COLUMN $col $definition");
+            }
         }
     } catch(Exception $e) {
         // Migration logging

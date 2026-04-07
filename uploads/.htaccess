@@ -1,0 +1,15 @@
+# Disable all engine execution
+Options -ExecCGI
+RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phps .pl .py .cgi .sh .asp .aspx
+php_flag engine off
+
+# Allow only standard images
+<FilesMatch ".*">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+
+<FilesMatch ".*\.(jpg|jpeg|png|gif|webp)$">
+    Order Allow,Deny
+    Allow from all
+</FilesMatch>

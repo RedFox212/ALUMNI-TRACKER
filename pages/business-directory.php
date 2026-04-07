@@ -89,7 +89,7 @@ $businesses = $pdo->query("SELECT b.*, u.name as owner_name FROM businesses b JO
 <body class="bg-white min-h-screen flex">
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-64">
+<main class="flex-1 flex flex-col lg:ml-72">
     <?php 
         $topbar_title = 'Business Directory';
         $topbar_subtitle = 'Shop Alumni First';

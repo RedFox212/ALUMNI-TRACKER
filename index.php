@@ -16,23 +16,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = $_POST['email'] ?? '';
     $password = $_POST['password'] ?? '';
     
-    $result = handleLogin($email, $password, $pdo);
-    if ($result['success']) {
-        // Fetch first_login status
-        $stmt = $pdo->prepare("SELECT role, first_login FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch();
-
-        if ($user['role'] === 'admin') {
-            header('Location: pages/dashboard.php'); // Admin uses main dashboard
-        } elseif ($user['first_login']) {
-            header('Location: pages/setup-profile.php');
-        } else {
-            header('Location: pages/dashboard.php');
-        }
-        exit;
+    // CSRF Check
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'] ?? '', $_POST['csrf_token'])) {
+        $error = "Security mismatch. Please refresh the page.";
     } else {
-        $error = $result['message'];
+        $result = handleLogin($email, $password, $pdo);
+        if ($result['success']) {
+            // Fetch first_login status
+            $stmt = $pdo->prepare("SELECT role, first_login FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
+
+            if ($user['role'] === 'admin') {
+                header('Location: pages/dashboard.php'); // Admin uses main dashboard
+            } elseif ($user['first_login']) {
+                header('Location: pages/setup-profile.php');
+            } else {
+                header('Location: pages/dashboard.php');
+            }
+            exit;
+        } else {
+            $error = $result['message'];
+        }
     }
 }
 ?>
@@ -50,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         :root { --bg-surface: #eef2f7; --card-bg: #ffffff; --text-main: #1f2937; --text-muted: #6b7280; --border-clr: #f1f5f9; }
         .dark { --bg-surface: #0f172a; --card-bg: #1e293b; --text-main: #f8fafc; --text-muted: #94a3b8; --border-clr: #334155; }
         
-        body { background-color: var(--bg-surface); overflow: hidden; height: 100vh; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
+        body { background-color: var(--bg-surface); min-h-screen; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; padding: 1.25rem; }
         .fade-slide-in { animation: fadeSlideIn 0.8s ease-out forwards; }
         @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .left-panel { background: linear-gradient(135deg, #1a3faa 0%, #1e56d9 100%); }
@@ -73,11 +78,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </button>
     </div>
 
-    <div class="w-full max-w-4xl h-[600px] p-5">
-        <div class="login-card flex bg-white rounded-[20px] h-full overflow-hidden shadow-2xl fade-slide-in">
+    <div class="w-full max-w-4xl min-h-[600px] py-10">
+        <div class="login-card flex flex-col md:flex-row bg-white rounded-[20px] h-full overflow-hidden shadow-2xl fade-slide-in">
             
-            <!-- Left Panel (40%) -->
-            <div class="left-panel relative w-2/5 p-10 flex flex-col justify-center items-center text-center text-white overflow-hidden">
+            <!-- Left Panel -->
+            <div class="left-panel relative w-full md:w-2/5 p-8 md:p-10 flex flex-col justify-center items-center text-center text-white overflow-hidden min-h-[250px] md:min-h-full">
                 <div class="blob w-40 h-40 top-1/4 left-0" style="animation-delay: 0s;"></div>
                 <div class="blob w-20 h-20 bottom-1/4 right-0" style="animation-delay: -5s;"></div>
                 
@@ -92,8 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </div>
 
-            <!-- Right Panel (60%) -->
-            <div class="w-3/5 p-16 flex items-center bg-white">
+            <!-- Right Panel -->
+            <div class="w-full md:w-3/5 p-8 md:p-16 flex items-center bg-white">
                 <div class="w-full max-w-sm mx-auto">
                     <h2 class="text-3xl font-bold text-gray-800">Sign in</h2>
                     <p class="text-gray-500 mt-2 mb-8">Enter your credentials to access the portal.</p>
@@ -103,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php endif; ?>
 
                     <form action="index.php" method="POST" class="space-y-4">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
                         <div class="relative">
                             <span class="absolute left-3 top-3 text-gray-400">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -122,13 +128,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <label class="flex items-center text-gray-600 cursor-pointer">
                                 <input type="checkbox" class="rounded text-blue-600 mr-2"> Remember me
                             </label>
-                            <a href="#" class="text-blue-600 font-medium hover:underline">Forgot Password?</a>
+                            <a href="forgot-password.php" class="text-blue-600 font-medium hover:underline">Forgot Password?</a>
                         </div>
 
                         <button type="submit" id="loginBtn" class="w-full h-11 bg-[#2563eb] text-white rounded-full font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-md mt-4 flex items-center justify-center group">
                             <span id="btnText">Sign In</span>
                             <svg id="spinner" class="animate-spin h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         </button>
+
+                        <p class="text-center text-sm text-gray-500 mt-6">
+                            Don't have an account? <a href="register.php" class="text-blue-600 font-bold hover:underline">Sign Up</a>
+                        </p>
 
                     <p class="text-center text-gray-400 text-xs mt-10">
                         &copy; 2026 Lyceum of Alabang – Alumni System
@@ -158,9 +168,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             updateDarkModeUI(!isDark);
         }
 
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            updateDarkModeUI(true);
-        }
+        (function() {
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                updateDarkModeUI(true);
+            } else {
+                updateDarkModeUI(false);
+            }
+        })();
 
         function togglePass() {
             const pass = document.getElementById('password');

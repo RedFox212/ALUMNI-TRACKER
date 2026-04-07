@@ -38,7 +38,7 @@ $pending = $pdo->query("SELECT u.name, a.*
 <body class="bg-slate-50 transition-colors duration-500">
     <?php require_once '../includes/sidebar.php'; ?>
 
-    <main class="flex-1 flex flex-col lg:ml-64">
+    <main class="flex-1 flex flex-col lg:ml-72">
         <?php $topbar_title = 'Mentor Verification'; $topbar_subtitle = 'Maintain Professional Standards'; require_once '../includes/topbar.php'; ?>
 
         <div class="p-8 max-w-5xl mx-auto w-full">
