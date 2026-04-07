@@ -9,15 +9,29 @@ $user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['user_role'] ?? 'alumni';
 $success = $error = null;
 
-// Handle RSVP (New Consolidated Logic)
+// Ensure schema is updated for RSVP and Categories
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS event_rsvps (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        event_id INT NOT NULL,
+        user_id INT NOT NULL,
+        status ENUM('Going', 'Maybe', 'Declined') NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_rsvp (event_id, user_id)
+    )");
+    $pdo->exec("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS category ENUM('Announcement', 'Event') DEFAULT 'Announcement'");
+} catch(Exception $e) {}
+
+// Handle RSVP
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rsvp'])) {
     if (!verifyCsrf()) { $error = "Security mismatch."; }
     else {
         $ev_id  = (int)$_POST['event_id'];
         $status = $_POST['status'] ?? 'Going';
+        // Use REPLACE INTO for broader cross-compatibility if duplicate key logic is needed
         $stmt = $pdo->prepare("INSERT INTO event_rsvps (event_id, user_id, status) VALUES (?,?,?) 
-                               ON DUPLICATE KEY UPDATE status = VALUES(status)");
-        if ($stmt->execute([$ev_id, $user_id])) {
+                               ON DUPLICATE KEY UPDATE status = ?");
+        if ($stmt->execute([$ev_id, $user_id, $status, $status])) {
             $success = "RSVP Updated for event!";
         }
     }
@@ -63,6 +77,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Handle administrative delete
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_announcement'])) {
+    if ($user_role !== 'admin') { $error = "Unauthorized."; }
+    elseif (!verifyCsrf()) { $error = "Security mismatch."; }
+    else {
+        $aid = (int)$_POST['announcement_id'];
+        $pdo->prepare("DELETE FROM announcements WHERE id = ?")->execute([$aid]);
+        $success = "Announcement pruned from history.";
+    }
+}
+
 // Fetch history (with RSVP status for events)
 $announcements = $pdo->query("
     SELECT a.*, u.name AS author,
@@ -83,11 +108,11 @@ $programs = $pdo->query("SELECT DISTINCT program FROM alumni ORDER BY program")-
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>body{font-family:'Inter',sans-serif;}</style>
 </head>
-<body class="bg-slate-50 min-h-screen flex">
+<body class="bg-slate-50 h-screen flex overflow-hidden">
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-72">
-    <header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 flex items-center justify-between sticky top-0 z-30 transition-all">
+<main class="flex-1 flex flex-col lg:ml-72 h-screen overflow-hidden">
+    <header class="h-16 flex-shrink-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 flex items-center justify-between sticky top-0 z-30 transition-all">
         <div class="flex items-center gap-3 text-slate-400">
             <span class="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tighter"><?php echo $user_role === 'admin' ? 'Communications' : 'Alumni News'; ?></span>
             <span class="w-1 h-1 bg-slate-200 dark:bg-slate-700 rounded-full"></span>
@@ -95,40 +120,41 @@ $programs = $pdo->query("SELECT DISTINCT program FROM alumni ORDER BY program")-
         </div>
     </header>
 
-    <div class="p-8 max-w-6xl mx-auto w-full">
-        <div class="mb-10 <?php echo $user_role !== 'admin' ? 'text-center' : ''; ?>">
-            <h1 class="text-3xl font-black text-slate-800 dark:text-white italic uppercase tracking-tighter">
-                <?php echo $user_role === 'admin' ? 'ANNOUNCEMENT CENTER' : 'LATEST NEWS & UPDATES'; ?>
-            </h1>
-            <p class="text-slate-400 dark:text-slate-500 text-sm font-medium">
-                <?php echo $user_role === 'admin' ? 'Issue official announcements and scheduled alumni events.' : 'Stay connected with formal institutional messages and upcoming events.'; ?>
-            </p>
-        </div>
+    <div class="flex-1 overflow-hidden">
+        <div class="h-full p-8 max-w-7xl mx-auto w-full flex flex-col">
+            <div class="mb-6 flex-shrink-0 <?php echo $user_role !== 'admin' ? 'text-center' : ''; ?>">
+                <h1 class="text-3xl font-black text-slate-800 dark:text-white italic uppercase tracking-tighter">
+                    <?php echo $user_role === 'admin' ? 'ANNOUNCEMENT CENTER' : 'LATEST NEWS & UPDATES'; ?>
+                </h1>
+                <p class="text-slate-400 dark:text-slate-500 text-sm font-medium">
+                    <?php echo $user_role === 'admin' ? 'Issue official announcements and scheduled alumni events.' : 'Stay connected with formal institutional messages and upcoming events.'; ?>
+                </p>
+            </div>
 
-        <?php if ($success): ?><div class="mb-6 bg-blue-50 text-blue-700 p-4 rounded-2xl text-sm font-bold border border-blue-100 italic">✅ <?php echo $success; ?></div><?php endif; ?>
-        <?php if ($error): ?><div class="mb-6 bg-red-100 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100">⚠️ <?php echo $error; ?></div><?php endif; ?>
+            <?php if ($success): ?><div class="mb-6 flex-shrink-0 bg-blue-50 text-blue-700 p-4 rounded-2xl text-sm font-bold border border-blue-100 italic">✅ <?php echo $success; ?></div><?php endif; ?>
+            <?php if ($error): ?><div class="mb-6 flex-shrink-0 bg-red-100 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100">⚠️ <?php echo $error; ?></div><?php endif; ?>
 
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+            <div class="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-8 min-h-0">
             <?php if ($user_role === 'admin'): ?>
             <!-- Composer -->
-            <div class="lg:col-span-2">
-                <div class="bg-white rounded-[40px] shadow-sm border border-slate-100 overflow-hidden">
-                    <div class="bg-slate-900 p-8 text-white">
+            <div class="lg:col-span-2 flex flex-col min-h-0">
+                <div class="flex-1 bg-white dark:bg-slate-900 rounded-[40px] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col">
+                    <div class="bg-slate-900 p-6 text-white flex-shrink-0">
                         <h2 class="text-2xl font-black italic uppercase tracking-tighter">Compose</h2>
                         <p class="text-slate-400 text-xs mt-1 font-medium uppercase tracking-widest">Formal Network Message</p>
                     </div>
-                    <form method="POST" class="p-8 space-y-4">
+                    <form method="POST" class="p-6 space-y-4 overflow-y-auto custom-scrollbar">
                         <?php echo csrfField(); ?>
                         <div>
                             <label class="block text-[10px] font-black text-slate-400 uppercase tracking-[3px] mb-2">Category</label>
                             <div class="flex gap-2">
-                                <label class="flex-1">
-                                    <input type="radio" name="category" value="Announcement" checked class="hidden peer">
-                                    <div class="h-11 flex items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 cursor-pointer transition-all">Announcement</div>
+                                <label class="flex-1 group">
+                                    <input type="radio" name="category" value="Announcement" checked class="sr-only peer">
+                                    <div class="h-11 flex items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 cursor-pointer transition-all hover:border-blue-500 dark:hover:border-blue-400 active:scale-95 shadow-sm">Announcement</div>
                                 </label>
-                                <label class="flex-1">
-                                    <input type="radio" name="category" value="Event" class="hidden peer">
-                                    <div class="h-11 flex items-center justify-center rounded-2xl bg-slate-50 border border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400 peer-checked:bg-rose-500 peer-checked:text-white peer-checked:border-rose-500 cursor-pointer transition-all">Event</div>
+                                <label class="flex-1 group">
+                                    <input type="radio" name="category" value="Event" class="sr-only peer">
+                                    <div class="h-11 flex items-center justify-center rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 peer-checked:bg-rose-500 peer-checked:text-white peer-checked:border-rose-500 cursor-pointer transition-all hover:border-rose-500 dark:hover:border-rose-400 active:scale-95 shadow-sm">Event</div>
                                 </label>
                             </div>
                         </div>
@@ -167,11 +193,11 @@ $programs = $pdo->query("SELECT DISTINCT program FROM alumni ORDER BY program")-
             <?php endif; ?>
 
             <!-- News Feed / Logs -->
-            <div class="<?php echo ($user_role === 'admin') ? 'lg:col-span-3' : 'lg:col-span-5 max-w-4xl mx-auto'; ?> space-y-6">
-                <h2 class="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[3px] mb-4 <?php echo $user_role !== 'admin' ? 'text-center' : ''; ?>">
+            <div class="<?php echo ($user_role === 'admin') ? 'lg:col-span-3' : 'lg:col-span-5 max-w-4xl mx-auto'; ?> flex flex-col min-h-0">
+                <h2 class="flex-shrink-0 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[3px] mb-4 <?php echo $user_role !== 'admin' ? 'text-center' : ''; ?>">
                     <?php echo $user_role === 'admin' ? 'Announcement History' : 'TODAY\'S FEED'; ?>
                 </h2>
-                <div class="bg-white dark:bg-slate-900 rounded-[40px] shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden divide-y divide-slate-50 dark:divide-slate-800/50 transition-all">
+                <div class="flex-1 bg-white dark:bg-slate-900 rounded-[40px] shadow-sm border border-slate-100 dark:border-slate-800 overflow-y-auto custom-scrollbar divide-y divide-slate-50 dark:divide-slate-800/50 transition-all">
                     <?php if (empty($announcements)): ?>
                         <p class="p-12 text-center text-xs text-slate-300 italic">No announcements recorded.</p>
                     <?php endif; ?>
@@ -205,14 +231,26 @@ $programs = $pdo->query("SELECT DISTINCT program FROM alumni ORDER BY program")-
                                 </div>
                                 <?php endif; ?>
                             </div>
-                            <div class="text-right">
+                            <div class="text-right flex flex-col items-end">
                                 <p class="text-[10px] font-black text-slate-300 dark:text-slate-600 uppercase tracking-widest mb-1"><?php echo date('M d', strtotime($ann['created_at'])); ?></p>
-                                <p class="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase italic">via <?php echo htmlspecialchars($ann['author']); ?></p>
+                                <p class="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase italic mb-3">via <?php echo htmlspecialchars($ann['author']); ?></p>
+                                
+                                <?php if ($user_role === 'admin'): ?>
+                                <form method="POST" onsubmit="return confirm('Prune this announcement?')" class="opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <?php echo csrfField(); ?>
+                                    <input type="hidden" name="announcement_id" value="<?php echo $ann['id']; ?>">
+                                    <input type="hidden" name="delete_announcement" value="1">
+                                    <button type="submit" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-red-500 hover:text-white transition-all flex items-center justify-center text-lg active:scale-90" title="Delete Announcement">
+                                        ×
+                                    </button>
+                                </form>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
                     <?php endforeach; ?>
                 </div>
+            </div>
             </div>
         </div>
     </div>

@@ -65,19 +65,26 @@ $verified = $pdo->query("SELECT u.id, u.name, a.alumni_id_num, a.batch_year, a.p
     <title>Identity Manager – LATS Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-    <style>body{font-family:'Inter',sans-serif;}</style>
+    <!-- Flash Guard -->
+    <script>(function(){const t=localStorage.getItem('lats-theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})();</script>
+    <style>
+        :root { background-color: #f1f5f9; }
+        .dark { background-color: #0c111d; }
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body class="bg-slate-50 min-h-screen flex">
+<body class="bg-slate-50 h-screen flex overflow-hidden">
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-72">
+<main class="flex-1 flex flex-col lg:ml-72 h-screen overflow-hidden">
     <?php 
         $topbar_title = 'Identity Manager';
         $topbar_subtitle = 'Institutional Credential Governance';
         require_once '../includes/topbar.php'; 
     ?>
 
-    <div class="p-8 max-w-6xl mx-auto w-full">
+    <div class="flex-1 flex flex-col h-full min-h-0">
+        <div class="flex-1 p-8 max-w-7xl mx-auto w-full flex flex-col min-h-0">
         <div class="mb-10">
             <h1 class="text-3xl font-black text-slate-800 italic uppercase tracking-tighter">ALUMNI VERIFICATION</h1>
             <p class="text-slate-400 text-sm font-medium">Approve alumni identity and issue unique digital ID numbers.</p>
@@ -86,11 +93,11 @@ $verified = $pdo->query("SELECT u.id, u.name, a.alumni_id_num, a.batch_year, a.p
         <?php if ($success): ?><div class="mb-6 bg-blue-50 text-blue-700 p-4 rounded-2xl text-sm font-bold border border-blue-100 italic">✅ <?php echo $success; ?></div><?php endif; ?>
         <?php if ($error): ?><div class="mb-6 bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100">⚠️ <?php echo $error; ?></div><?php endif; ?>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-0">
             
             <!-- Pending Verification -->
-            <div class="lg:col-span-2 space-y-6">
-                <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[3px] mb-4">Pending Issuance (<?php echo count($pending); ?>)</h2>
+            <div class="lg:col-span-2 flex flex-col min-h-0">
+                <h2 class="flex-shrink-0 text-[10px] font-black text-slate-400 uppercase tracking-[3px] mb-4">Pending Issuance (<?php echo count($pending); ?>)</h2>
                 
                 <?php if (empty($pending)): ?>
                     <div class="bg-white rounded-[40px] p-12 text-center border-2 border-dashed border-slate-200">
@@ -99,7 +106,7 @@ $verified = $pdo->query("SELECT u.id, u.name, a.alumni_id_num, a.batch_year, a.p
                         <p class="text-slate-400 text-sm">All registered alumni have been issued their digital credentials.</p>
                     </div>
                 <?php else: ?>
-                    <div class="bg-white rounded-[32px] overflow-hidden shadow-sm border border-slate-100">
+                    <div class="flex-1 bg-white rounded-[32px] overflow-y-auto custom-scrollbar shadow-sm border border-slate-100">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50">
                                 <tr>
@@ -140,9 +147,9 @@ $verified = $pdo->query("SELECT u.id, u.name, a.alumni_id_num, a.batch_year, a.p
             </div>
 
             <!-- Recent Activity / Verification Stats -->
-            <div class="space-y-6">
-                <h2 class="text-[10px] font-black text-slate-400 uppercase tracking-[3px] mb-4">Recent Verified</h2>
-                <div class="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 space-y-6">
+            <div class="flex flex-col min-h-0">
+                <h2 class="flex-shrink-0 text-[10px] font-black text-slate-400 uppercase tracking-[3px] mb-4">Recent Verified</h2>
+                <div class="flex-1 bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 space-y-6 overflow-y-auto custom-scrollbar">
                     <?php foreach ($verified as $v): ?>
                     <div class="flex items-center justify-between group">
                         <div class="flex items-center gap-3">
@@ -161,14 +168,9 @@ $verified = $pdo->query("SELECT u.id, u.name, a.alumni_id_num, a.batch_year, a.p
                     <?php endif; ?>
                 </div>
                 
-                <div class="bg-blue-600 rounded-[32px] p-8 text-white shadow-xl shadow-blue-100">
-                    <h3 class="text-lg font-black italic uppercase tracking-tighter mb-2 italic">Institutional Note</h3>
-                    <p class="text-blue-100 text-[10px] font-medium leading-relaxed uppercase tracking-widest opacity-80">
-                        Issuing an ID number grants the alumnus full access to verified-only features including the Mentorship portal and official transcript requests.
-                    </p>
-                </div>
             </div>
 
+            </div>
         </div>
     </div>
 </main>

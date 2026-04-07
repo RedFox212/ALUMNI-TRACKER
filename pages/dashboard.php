@@ -180,11 +180,21 @@ $pending_spots = ($user_role === 'admin') ? (int)$pdo->query("SELECT COUNT(*) FR
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - LATS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Inter', sans-serif; }</style>
+    <!-- Flash Guard: Anti-Flicker Script -->
+    <script>
+        (function() {
+            const t = localStorage.getItem('lats-theme');
+            if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+    <style>
+        /* Instant Background Painting */
+        :root { background-color: #f1f5f9; }
+        .dark { background-color: #0c111d; }
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
 <body class="bg-slate-50 min-h-screen flex">
 

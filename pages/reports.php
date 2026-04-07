@@ -30,49 +30,6 @@ $where_sq = " WHERE " . implode(" AND ", $where_clauses);
 $where_sq_u = " WHERE " . implode(" AND ", str_replace("program", "a.program", str_replace("batch_year", "a.batch_year", $where_clauses)));
 
 
-// Handle CSV Export
-if (isset($_GET['export'])) {
-    $type = $_GET['export'];
-    header('Content-Type: text/csv');
-    header('Content-Disposition: attachment; filename="lats_' . $type . '_' . date('Ymd') . '.csv"');
-    $out = fopen('php://output', 'w');
-
-    if ($type === 'alumni') {
-        fputcsv($out, ['Name', 'Email', 'Program', 'Batch Year', 'Company', 'Job Title', 'Employment Status', 'Years Experience', 'Address', 'Contact']);
-        $rows = $pdo->query("SELECT u.name, u.email, a.program, a.batch_year, a.company, a.job_title, a.employment_status, a.years_experience, a.address, a.contact_no FROM users u JOIN alumni a ON u.id = a.user_id ORDER BY a.batch_year DESC, u.name ASC")->fetchAll();
-        foreach ($rows as $r) { fputcsv($out, $r); }
-    } elseif ($type === 'employment') {
-        fputcsv($out, ['Employment Status', 'Count']);
-        $rows = $pdo->query("SELECT employment_status, COUNT(*) as count FROM alumni GROUP BY employment_status ORDER BY count DESC")->fetchAll();
-        foreach ($rows as $r) { fputcsv($out, [$r['employment_status'], $r['count']]); }
-    } elseif ($type === 'program') {
-        fputcsv($out, ['Program', 'Count', 'Employed', 'In-Discipline']);
-        $rows = $pdo->query("SELECT program, COUNT(*) as total, SUM(CASE WHEN employment_status='Employed' THEN 1 ELSE 0 END) as employed, SUM(CASE WHEN discipline_match=1 THEN 1 ELSE 0 END) as indiscipline FROM alumni GROUP BY program ORDER BY total DESC")->fetchAll();
-        foreach ($rows as $r) { fputcsv($out, [$r['program'], $r['total'], $r['employed'], $r['indiscipline']]); }
-    } elseif ($type === 'master') {
-        fputcsv($out, [
-            'System ID', 'Alumni ID Num', 'Full Name', 'Gender', 'Email', 
-            'Program', 'Batch Year', 'Degree', 'College', 
-            'Employment Status', 'Company', 'Job Title', 'Job Alignment', 'Years Experience', 
-            'Skills', 'Advanced Degrees', 'Contact No', 'Verification Status'
-        ]);
-        $rows = $pdo->query("
-            SELECT 
-                a.id, a.alumni_id_num, CONCAT(a.first_name, ' ', a.middle_name, ' ', a.last_name) as full_name, 
-                a.gender, u.email, a.program, a.batch_year, a.degree, a.college, 
-                a.employment_status, a.company, a.job_title, 
-                (CASE WHEN a.discipline_match=1 THEN 'Aligned' ELSE 'Not Aligned' END) as alignment,
-                a.years_experience, a.skills, 
-                CONCAT_WS(', ', NULLIF(a.masteral, ''), NULLIF(a.doctorate, '')) as advanced,
-                a.contact_no, a.verification_status
-            FROM users u 
-            JOIN alumni a ON u.id = a.user_id 
-            ORDER BY a.batch_year DESC, full_name ASC
-        ")->fetchAll();
-        foreach ($rows as $r) { fputcsv($out, $r); }
-    }
-    fclose($out); exit;
-}
 
 // ── Stats ──────────────────────────────────────────
 $total_alumni   = $pdo->prepare("SELECT COUNT(*) FROM alumni" . $where_sq);
@@ -116,10 +73,34 @@ $bb_stmt = $pdo->prepare(
         SUM(CASE WHEN employment_status='Employed' THEN 1 ELSE 0 END) as employed
      FROM alumni
      " . $where_sq . "
-     GROUP BY batch_year ORDER BY batch_year DESC LIMIT 20"
+     GROUP BY batch_year ORDER BY batch_year DESC"
 );
 $bb_stmt->execute($params);
-$by_batch = $bb_stmt->fetchAll();
+$batch_results = $bb_stmt->fetchAll();
+
+// Fill in gaps from 2004 to current (2026)
+$current_year = (int)date('Y');
+$target_max_year = max(2026, $current_year);
+$full_range = range(2004, $target_max_year);
+$by_batch = [];
+$batch_map = [];
+foreach ($batch_results as $r) { $batch_map[$r['batch_year']] = $r; }
+
+foreach ($full_range as $yr) {
+    if (isset($batch_map[$yr])) {
+        $by_batch[] = $batch_map[$yr];
+    } else {
+        $by_batch[] = ['batch_year' => $yr, 'total' => 0, 'employed' => 0];
+    }
+}
+// Reverse to show newest first in the logical flow or keep chronological? 
+// User wants to see every batch, usually newest first is better for dashboards.
+usort($by_batch, function($a, $b) { return $b['batch_year'] <=> $a['batch_year']; });
+
+$max_batch = 1;
+if (!empty($by_batch)) {
+    $max_batch = max(array_column($by_batch, 'total')) ?: 1;
+}
 
 // ── Employment Breakdown ────────────────────────────
 // Fetch aligned vs other employment details
@@ -173,7 +154,8 @@ $import_logs = $pdo->query(
 
 // Fetch filter options
 $programs_list = $pdo->query("SELECT DISTINCT program FROM alumni WHERE program IS NOT NULL ORDER BY program")->fetchAll(PDO::FETCH_COLUMN);
-$batches_list  = $pdo->query("SELECT DISTINCT batch_year FROM alumni WHERE batch_year IS NOT NULL ORDER BY batch_year DESC")->fetchAll(PDO::FETCH_COLUMN);
+$batches_list  = range(2004, (int)date('Y'));
+rsort($batches_list);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -182,9 +164,13 @@ $batches_list  = $pdo->query("SELECT DISTINCT batch_year FROM alumni WHERE batch
     <title>Reports – LATS Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <!-- Flash Guard -->
+    <script>(function(){const t=localStorage.getItem('lats-theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})();</script>
     <style>
+        :root { background-color: #f1f5f9; }
+        .dark { background-color: #0c111d; }
         body { font-family: 'Inter', sans-serif; }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
@@ -201,10 +187,7 @@ $batches_list  = $pdo->query("SELECT DISTINCT batch_year FROM alumni WHERE batch
             <span class="w-1 h-1 bg-slate-200 dark:bg-slate-700 rounded-full"></span>
             <span class="text-xs italic">Analytics Overview</span>
         </div>
-        <div class="flex items-center gap-2">
-            <a href="?export=master"     class="h-9 px-4 bg-indigo-600 text-white font-bold text-[10px] rounded-xl hover:bg-indigo-700 flex items-center gap-1.5 transition-all shadow-lg shadow-indigo-100 dark:shadow-none uppercase tracking-widest">📊 Master Executive CSV</a>
-            <a href="?export=alumni"     class="h-9 px-4 bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-bold text-[10px] rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-all uppercase tracking-widest">👥 Alumni Export</a>
-        </div>
+        <div></div>
     </header>
 
     <div class="p-8">
@@ -251,7 +234,12 @@ $batches_list  = $pdo->query("SELECT DISTINCT batch_year FROM alumni WHERE batch
             <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden transition-all">
                 <div class="p-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/30 dark:bg-slate-800/30">
                     <h2 class="font-black text-slate-900 dark:text-white uppercase tracking-tighter">Alumni by Program</h2>
-                    <a href="?export=program" class="text-xs text-blue-600 dark:text-blue-400 font-black hover:underline uppercase tracking-widest">Export All →</a>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Total registered </span>
+                        <span class="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-black rounded-full border border-indigo-100 dark:border-indigo-800/50">
+                            <?php echo number_format($total_alumni); ?>
+                        </span>
+                    </div>
                 </div>
                 <div class="max-h-[400px] overflow-y-auto custom-scrollbar">
                     <table class="w-full border-collapse">
@@ -307,69 +295,67 @@ $batches_list  = $pdo->query("SELECT DISTINCT batch_year FROM alumni WHERE batch
             </div>
             <div class="p-6">
                 <!-- Executive Summary -->
-                <?php if ($peak_batch): ?>
-                <div class="flex gap-3 mb-8 overflow-x-auto pb-2 custom-scrollbar">
-                    <div class="flex-shrink-0 bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-4 border border-blue-100 dark:border-blue-800/50 min-w-[180px]">
-                        <p class="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1">Peak Batch Size</p>
-                        <div class="flex items-baseline gap-2">
-                            <span class="text-xl font-black text-slate-900 dark:text-white"><?php echo $peak_batch['batch_year']; ?></span>
-                            <span class="text-xs font-black text-blue-600 dark:text-blue-400"><?php echo $peak_batch['total']; ?> Alumni</span>
-                        </div>
-                    </div>
-                    <?php if ($best_job_batch): ?>
-                    <div class="flex-shrink-0 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl p-4 border border-emerald-100 dark:border-emerald-800/50 min-w-[200px]">
-                        <p class="text-[9px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-1">Peak Placement Rate</p>
-                        <div class="flex items-baseline gap-2">
-                            <span class="text-xl font-black text-emerald-900 dark:text-emerald-400">Class of <?php echo $best_job_batch['batch_year']; ?></span>
-                            <span class="text-xs font-black text-emerald-600 dark:text-emerald-300"><?php echo round(($best_job_batch['employed']/$best_job_batch['total'])*100); ?>% Placed</span>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-                </div>
-                <?php endif; ?>
 
-                <div class="max-h-[500px] overflow-y-auto pr-4 custom-scrollbar space-y-6">
+                <div class="max-h-[400px] overflow-y-auto pr-4 custom-scrollbar">
+                    <div class="space-y-1">
                     <?php if (empty($by_batch)): ?>
-                        <p class="text-center py-10 text-slate-400 text-sm italic">No records found for current filters.</p>
+                        <div class="text-center py-6 text-slate-400 text-[10px] italic">No records found.</div>
                     <?php else: ?>
                         <?php foreach ($by_batch as $b):
-                            $bar_w = round(($b['total'] / $max_batch) * 100);
                             $emp_w = $b['total'] > 0 ? round(($b['employed']/$b['total'])*100) : 0;
-                            $other_w = 100 - $emp_w;
                         ?>
-                        <div class="group">
-                            <div class="flex justify-between items-end mb-2 px-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-lg font-black text-slate-900 dark:text-white tracking-tighter transition-all group-hover:text-blue-600"><?php echo $b['batch_year']; ?></span>
-                                    <span class="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-[9px] font-black text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 uppercase">Population: <?php echo $b['total']; ?></span>
+                        <div class="group flex items-center gap-4 py-1.5 px-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-800">
+                            <!-- Year & Count -->
+                            <div class="w-16 flex-shrink-0">
+                                <h3 class="text-sm font-black text-slate-900 dark:text-white tracking-tighter transition-all group-hover:text-indigo-600"><?php echo $b['batch_year']; ?></h3>
+                                <p class="text-[7px] font-black text-slate-400 uppercase tracking-widest -mt-0.5"><?php echo $b['total']; ?> Alumni</p>
+                            </div>
+
+                            <!-- Progress Bar Alignment -->
+                            <div class="flex-1 flex items-center gap-3">
+                                <div class="flex-1 h-1 bg-slate-100 dark:bg-slate-800/60 rounded-full overflow-hidden">
+                                    <div class="h-full bg-indigo-500 rounded-full transition-all duration-1000 group-hover:bg-indigo-400" style="width:<?php echo $emp_w; ?>%"></div>
                                 </div>
-                                <div class="flex gap-4">
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></div>
-                                        <span class="text-[10px] font-black text-slate-900 dark:text-slate-300 tracking-tight transition-all"><?php echo $emp_w; ?>% Working</span>
-                                    </div>
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700"></div>
-                                        <span class="text-[10px] font-black text-slate-400 dark:text-slate-500 tracking-tight transition-all"><?php echo $other_w; ?>% Other</span>
-                                    </div>
+                                <div class="w-10 text-right">
+                                    <span class="text-[10px] font-black text-slate-800 dark:text-slate-300"><?php echo $emp_w; ?>%</span>
                                 </div>
                             </div>
-                            <div class="h-4 bg-slate-50 dark:bg-slate-800/50 rounded-full overflow-hidden flex relative shadow-inner border border-slate-100/50 dark:border-slate-800/50" style="width:<?php echo max(35, $bar_w); ?>%">
-                                <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-r-lg transition-all duration-1000 delay-100 shadow-lg shadow-blue-500/20" style="width:<?php echo $emp_w; ?>%"></div>
-                                <div class="h-full bg-slate-200 dark:bg-slate-700 transition-all duration-1000 delay-300" style="width:<?php echo $other_w; ?>%"></div>
-                            </div>
+                            
+                            <!-- Small Status Dot -->
+                            <div class="w-1.5 h-1.5 rounded-full <?php echo $emp_w > 70 ? 'bg-emerald-500' : ($emp_w > 30 ? 'bg-amber-400' : 'bg-rose-400'); ?> shadow-sm"></div>
                         </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Additional Stats Row -->
-        <div class="flex justify-center">
-            <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 text-center w-full max-w-sm">
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Records Imported</p>
-                <p class="text-4xl font-black text-green-600"><?php echo number_format($total_imports); ?></p>
+        <!-- Total Database Counter -->
+        <div class="flex justify-center mt-12 mb-8">
+            <div class="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-[32px] p-8 shadow-sm border border-emerald-100 dark:border-emerald-800/50 text-center w-full max-w-sm relative overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1 group">
+                <!-- Decorative Elements -->
+                <div class="absolute -top-6 -right-6 w-24 h-24 bg-emerald-500 rounded-full opacity-[0.03] dark:opacity-[0.1] transform group-hover:scale-125 transition-transform duration-700"></div>
+                <div class="absolute -bottom-8 -left-8 w-32 h-32 bg-teal-500 rounded-full opacity-[0.02] dark:opacity-[0.05] transform group-hover:scale-110 transition-transform duration-1000"></div>
+                
+                <div class="relative z-10">
+                    <p class="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[2px] mb-3">Total Alumni Database</p>
+                    <div class="flex items-center justify-center gap-4 mb-2">
+                        <span class="text-5xl font-black text-emerald-700 dark:text-emerald-300 tracking-tighter"><?php echo number_format($total_alumni); ?></span>
+                        <div class="h-8 w-[1px] bg-emerald-200 dark:bg-emerald-800"></div>
+                        <div class="text-left">
+                            <p class="text-[9px] font-black text-emerald-600 dark:text-emerald-500 uppercase leading-none">Database</p>
+                            <p class="text-[9px] font-bold text-emerald-400 dark:text-emerald-600 uppercase">Synced</p>
+                        </div>
+                    </div>
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 bg-white/60 dark:bg-emerald-900/30 rounded-full border border-emerald-100 dark:border-emerald-800/40">
+                        <span class="relative flex h-1.5 w-1.5">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                        </span>
+                        <span class="text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">System Active</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

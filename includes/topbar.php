@@ -2,7 +2,31 @@
 // includes/topbar.php - Shared top navigation bar
 $unread_count = $unread_count ?? 0;
 $pending_spots = $pending_spots ?? 0;
+
+// Load System Broadcast
+$sys_cfg = json_decode(@file_get_contents(__DIR__ . '/settings_store.json'), true) ?: ['broadcast_active' => false];
 ?>
+
+<?php if ($sys_cfg['broadcast_active'] && !empty($sys_cfg['broadcast_msg'])): ?>
+<div class="bg-indigo-600 text-white px-8 py-3 flex items-center justify-between overflow-hidden relative group">
+    <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/20 via-white/5 to-transparent animate-shimmer" style="background-size: 200% 100%;"></div>
+    <div class="flex items-center gap-4 relative z-10">
+        <span class="flex-shrink-0 w-8 h-8 bg-white/10 rounded-xl flex items-center justify-center text-lg animate-bounce">📢</span>
+        <p class="text-xs font-black uppercase tracking-[2px] italic leading-tight">
+            <?php echo htmlspecialchars($sys_cfg['broadcast_msg']); ?>
+        </p>
+    </div>
+    <div class="hidden md:flex items-center gap-2 relative z-10">
+        <span class="w-1.5 h-1.5 bg-white/40 rounded-full"></span>
+        <span class="text-[9px] font-black uppercase tracking-widest text-white/50 italic">System Alert</span>
+    </div>
+</div>
+<style>
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.animate-shimmer { animation: shimmer 8s linear infinite; }
+</style>
+<?php endif; ?>
+
 <header class="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-100 dark:border-slate-800 px-8 flex items-center justify-between sticky top-0 z-30 transition-all duration-500">
     <!-- Mobile Menu Toggle -->
     <button onclick="toggleSidebar()" class="lg:hidden p-2 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 rounded-xl hover:bg-white dark:hover:bg-slate-700 transition-all shadow-sm border border-slate-100 dark:border-slate-700">

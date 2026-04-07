@@ -82,14 +82,21 @@ $role_colors = ['admin'=>'bg-red-100 text-red-600','alumni'=>'bg-green-100 text-
     <title>Manage Users – LATS Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Inter', sans-serif; } .modal { display:none; } .modal.open { display:flex; }</style>
+    <!-- Flash Guard -->
+    <script>(function(){const t=localStorage.getItem('lats-theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');})();</script>
+    <style>
+        :root { background-color: #f1f5f9; }
+        .dark { background-color: #0c111d; }
+        body { font-family: 'Inter', sans-serif; }
+        .modal { display:none; } .modal.open { display:flex; }
+    </style>
 </head>
-<body class="bg-slate-50 min-h-screen flex">
+<body class="bg-slate-50 h-screen flex overflow-hidden">
 
 <?php require_once '../includes/sidebar.php'; ?>
 
-<main class="flex-1 flex flex-col lg:ml-72">
-    <header class="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
+<main class="flex-1 flex flex-col lg:ml-72 h-screen overflow-hidden">
+    <header class="h-16 flex-shrink-0 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-30">
         <div class="flex items-center gap-3 text-slate-400">
             <span class="text-sm font-medium text-slate-800 uppercase tracking-tighter">Manage Users</span>
             <span class="w-1 h-1 bg-slate-200 rounded-full"></span>
@@ -98,7 +105,8 @@ $role_colors = ['admin'=>'bg-red-100 text-red-600','alumni'=>'bg-green-100 text-
         <span class="text-xs bg-slate-100 text-slate-500 font-bold px-3 py-1 rounded-full"><?php echo count($users); ?> users</span>
     </header>
 
-    <div class="p-8">
+    <div class="flex-1 flex flex-col min-h-0">
+        <div class="flex-1 p-8 max-w-7xl mx-auto w-full flex flex-col min-h-0">
         <div class="mb-8">
             <h1 class="text-3xl font-black text-slate-800 italic">MANAGE USERS</h1>
             <p class="text-slate-400 text-sm font-medium">Activate, deactivate, change roles, and reset passwords.</p>
@@ -109,7 +117,7 @@ $role_colors = ['admin'=>'bg-red-100 text-red-600','alumni'=>'bg-green-100 text-
         <?php if ($error): ?><div class="mb-6 bg-red-50 border border-red-100 text-red-600 px-5 py-3 rounded-2xl text-sm font-medium"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 
         <!-- Filter Bar -->
-        <form class="bg-white rounded-3xl shadow-sm border border-slate-100 p-8 mb-10 flex flex-wrap gap-6 items-center">
+        <form class="flex-shrink-0 bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-8 flex flex-wrap gap-4 items-center">
             <div class="flex-1 relative min-w-[300px]">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-4 top-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 <input type="text" name="search" value="<?php echo htmlspecialchars($search_q); ?>" placeholder="Search name or email..."
@@ -144,7 +152,7 @@ $role_colors = ['admin'=>'bg-red-100 text-red-600','alumni'=>'bg-green-100 text-
         </form>
 
         <!-- Table -->
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="flex-1 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-y-auto custom-scrollbar min-h-0">
             <table class="w-full">
                 <thead>
                     <tr class="bg-slate-50/70 border-b border-slate-100">
